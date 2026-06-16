@@ -1,0 +1,39 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model PlanningDay {
+  id          Int      @id @default(autoincrement())
+  year        Int
+  date        DateTime
+  heure_debut String   @default("19h15")
+  date_fin    DateTime
+  heure_fin   String   @default("19h15")
+  pharmacie   String
+  adresse     String
+  type        String
+  modified    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([year])
+  @@index([date])
+}
+
+model YearConfig {
+  id                  Int      @id @default(autoincrement())
+  year                Int      @unique
+  last_ferie_pharma   String
+  last_ferie_idx      Int
+  last_domingo_pharma String
+  last_domingo_idx    Int
+  last_lundi_pharma   String
+  last_semaine_idx    Int
+  generated           Boolean  @default(false)
+  createdAt           DateTime @default(now())
+}

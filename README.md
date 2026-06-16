@@ -1,36 +1,69 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Planning Gardes Pharmacies — Secteur Albertville
 
-## Getting Started
+Application web pour générer et gérer le planning annuel de gardes de pharmacies du secteur d'Albertville (Savoie, France).
 
-First, run the development server:
+## Stack
+
+- **Next.js 14** (App Router)
+- **Tailwind CSS**
+- **Prisma + Neon PostgreSQL**
+- **SheetJS (xlsx)** pour import/export Excel
+- **TypeScript**
+
+## Démarrage
+
+### 1. Configuration
+
+```bash
+cp .env.example .env
+```
+
+Renseignez `DATABASE_URL` avec votre chaîne de connexion [Neon](https://neon.tech).
+
+### 2. Base de données
+
+```bash
+npm install
+npx prisma db push
+```
+
+### 3. Lancement
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Ouvrez [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Utilisation
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. **Importer** un planning Excel existant (ex. 2026) via `/import` pour initialiser les rotations.
+2. **Générer** une nouvelle année via `/generate` — les paramètres sont déduits de l'année précédente.
+3. **Consulter / modifier** le planning sur `/planning/[year]`.
+4. **Exporter** au format Excel Norman via le bouton « Exporter Excel ».
 
-## Learn More
+## Déploiement Vercel
 
-To learn more about Next.js, take a look at the following resources:
+1. Créez un projet sur [Vercel](https://vercel.com) lié à ce dépôt.
+2. Ajoutez la variable d'environnement `DATABASE_URL`.
+3. Le build exécute automatiquement `prisma generate`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Groupes de pharmacies
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Groupe | Pharmacies | Gardes |
+|--------|-----------|--------|
+| Centre Albertville | 8 | Week-ends + fériés |
+| Maurienne | 2 | Lundis en alternance |
+| Extérieures | 10 | Mardi–vendredi (Mercury & Fina Tardy : 2 jours consécutifs) |
 
-## Deploy on Vercel
+## Structure
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+src/
+  lib/
+    generatePlanning.ts   # Logique de génération
+    pharmacies.ts         # Données des 20 pharmacies
+    excel.ts              # Import/export xlsx
+  components/             # UI réutilisable
+  app/                    # Pages et API routes
+```
