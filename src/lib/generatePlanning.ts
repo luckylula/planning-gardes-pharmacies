@@ -21,38 +21,32 @@ import type {
 const HEURE = "19h15";
 const PLANNING_DAYS = 364;
 
-/** Algorithme de Butcher pour le calcul de Pâques */
+/** Algorithme de Oudin (1940) — calcul fiable de Pâques */
 export function getEaster(year: number): Date {
-  const a = year % 19;
-  const b = Math.floor(year / 100);
-  const c = year % 100;
-  const d = Math.floor(b / 4);
-  const e = b % 4;
-  const f = Math.floor((b + 8) / 25);
-  const g = Math.floor((b - f + 1) / 3);
-  const h = (19 * a + b - d - g + 15) % 30;
-  const i = Math.floor(c / 4);
-  const k = c % 4;
-  const l = (32 + 2 * e + 2 * i - h - k) % 7;
-  const m = Math.floor((a + 11 * h + 22 * l) / 451);
-  const month = Math.floor((h + l - 7 * m + 114) / 31);
-  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  const f = Math.floor;
+  const G = year % 19;
+  const C = f(year / 100);
+  const H =
+    (C - f(C / 4) - f((8 * C + 13) / 25) + 19 * G + 15) % 30;
+  const I =
+    H -
+    f(H / 28) * (1 - f(29 / (H + 1)) * f((21 - G) / 11));
+  const J = (year + f(year / 4) + I + 2 - C + f(C / 4)) % 7;
+  const L = I - J;
+  const month = 3 + f((L + 40) / 44);
+  const day = L + 28 - 31 * f(month / 4);
   return utcDate(year, month, day);
 }
 
 export function getFeriesDates(year: number): Date[] {
   const easter = getEaster(year);
-  const easterMonday = addDays(easter, 1);
-  const ascension = addDays(easter, 39);
-  const pentecoteMonday = addDays(easter, 50);
-
   return [
     utcDate(year, 1, 1),
-    easterMonday,
+    addDays(easter, 1),
     utcDate(year, 5, 1),
     utcDate(year, 5, 8),
-    ascension,
-    pentecoteMonday,
+    addDays(easter, 39),
+    addDays(easter, 50),
     utcDate(year, 7, 14),
     utcDate(year, 8, 15),
     utcDate(year, 11, 1),
@@ -61,10 +55,12 @@ export function getFeriesDates(year: number): Date[] {
   ];
 }
 
-export function getFeriesSet(year: number): Set<string> {
-  const nextYearFeries = getFeriesDates(year + 1);
-  const all = [...getFeriesDates(year), ...nextYearFeries];
-  return new Set(all.map(dateKey));
+/** Ensemble des jours fériés couvrant la période du planning */
+export function getFeriesSet(planningYear: number): Set<string> {
+  const keys = new Set<string>();
+  for (const d of getFeriesDates(planningYear)) keys.add(dateKey(d));
+  for (const d of getFeriesDates(planningYear + 1)) keys.add(dateKey(d));
+  return keys;
 }
 
 function makeDay(
@@ -74,12 +70,11 @@ function makeDay(
   adresse: string,
   type: PlanningDayType
 ): PlanningDayInput {
-  const dateFin = addDays(dateDebut, 1);
   return {
     year,
     date: dateDebut,
     heure_debut: HEURE,
-    date_fin: dateFin,
+    date_fin: addDays(dateDebut, 1),
     heure_fin: HEURE,
     pharmacie,
     adresse,
@@ -87,9 +82,19 @@ function makeDay(
   };
 }
 
+function takeCentrePharmacy(idx: number): {
+  pharma: (typeof PHARMACIES_CENTRE)[0];
+  idx: number;
+} {
+  const pharma = getPharmacyByIdx("centre", idx);
+  return {
+    pharma,
+    idx: (idx + 1) % PHARMACIES_CENTRE.length,
+  };
+}
+
 interface RotationState {
-  ferieIdx: number;
-  domingoIdx: number;
+  centreIdx: number;
   lundiNext: "lauziere" | "grand_arc";
   semaineIdx: number;
   activeTwoDay: string | null;
@@ -112,12 +117,8 @@ function nextNonTwoDayIdx(fromIdx: number): number {
 function assignSemaine(
   date: Date,
   dow: number,
-  feries: Set<string>,
   state: RotationState
-): PlanningDayInput | null {
-  if (dow < 2 || dow > 5) return null;
-  if (feries.has(dateKey(date))) return null;
-
+): PlanningDayInput {
   const daysLeft = 5 - dow + 1;
 
   if (state.activeTwoDay) {
@@ -165,8 +166,7 @@ function assignSemaine(
       );
     }
     state.pendingTwoDay = { idx: state.semaineIdx };
-    const subIdx = nextNonTwoDayIdx(state.semaineIdx);
-    const sub = PHARMACIES_EXTERIEURES[subIdx];
+    const sub = PHARMACIES_EXTERIEURES[nextNonTwoDayIdx(state.semaineIdx)];
     return makeDay(
       date.getFullYear(),
       date,
@@ -187,95 +187,100 @@ function assignSemaine(
   );
 }
 
-export function configFromYearConfig(prev: YearConfigState): GenerateConfig {
+export function normalizeGenerateConfig(
+  config: Partial<GenerateConfig>
+): GenerateConfig {
+  const centre =
+    config.centreStartIdx ??
+    config.ferieStartIdx ??
+    config.domingoStartIdx ??
+    0;
   return {
-    ferieStartIdx: (prev.last_ferie_idx + 1) % PHARMACIES_CENTRE.length,
-    domingoStartIdx: (prev.last_domingo_idx + 1) % PHARMACIES_CENTRE.length,
-    lundiNext: prev.last_lundi_pharma.toLowerCase().includes("lauzière") ||
-      prev.last_lundi_pharma.toLowerCase().includes("lauziere")
-      ? "grand_arc"
-      : "lauziere",
+    centreStartIdx: centre,
+    ferieStartIdx: centre,
+    domingoStartIdx: centre,
+    lundiNext: config.lundiNext ?? "grand_arc",
+    semaineStartIdx: config.semaineStartIdx ?? 0,
+  };
+}
+
+export function configFromYearConfig(prev: YearConfigState): GenerateConfig {
+  const lastCentre = Math.max(prev.last_ferie_idx, prev.last_domingo_idx);
+  const nextCentre = (lastCentre + 1) % PHARMACIES_CENTRE.length;
+  return {
+    centreStartIdx: nextCentre,
+    ferieStartIdx: nextCentre,
+    domingoStartIdx: nextCentre,
+    lundiNext:
+      isLauziereName(prev.last_lundi_pharma) ? "grand_arc" : "lauziere",
     semaineStartIdx:
       (prev.last_semaine_idx + 1) % PHARMACIES_EXTERIEURES.length,
   };
 }
 
+function isLauziereName(name: string): boolean {
+  const n = name.toLowerCase();
+  return n.includes("lauzière") || n.includes("lauziere");
+}
+
 export function generatePlanning(
   year: number,
-  config: GenerateConfig
+  rawConfig: GenerateConfig
 ): { days: PlanningDayInput[]; finalState: YearConfigState } {
+  const config = normalizeGenerateConfig(rawConfig);
   const start = getFirstMondayOfJanuary(year);
   const feries = getFeriesSet(year);
   const days: PlanningDayInput[] = [];
 
   const state: RotationState = {
-    ferieIdx: config.ferieStartIdx,
-    domingoIdx: config.domingoStartIdx,
+    centreIdx: config.centreStartIdx,
     lundiNext: config.lundiNext,
     semaineIdx: config.semaineStartIdx,
     activeTwoDay: null,
     pendingTwoDay: null,
   };
 
-  let lastFeriePharma = "";
-  let lastFerieIdx = config.ferieStartIdx;
-  let lastDomingoPharma = "";
-  let lastDomingoIdx = config.domingoStartIdx;
+  let lastCentrePharma = "";
+  let lastCentreIdx = config.centreStartIdx;
   let lastLundiPharma = "";
 
   for (let i = 0; i < PLANNING_DAYS; i++) {
     const dateDebut = addDays(start, i);
     const dow = dateDebut.getDay();
-    const key = dateKey(dateDebut);
-    const isFerie = feries.has(key);
+    const isFerie = feries.has(dateKey(dateDebut));
     const planningYear = dateDebut.getFullYear();
 
+    // SAMEDI → Centre Albertville (rotation unique), type weekend
     if (dow === 6) {
-      const sunday = addDays(dateDebut, 1);
-      const sundayIsFerie = feries.has(dateKey(sunday));
-
-      let pharma;
-      if (sundayIsFerie || isFerie) {
-        pharma = getPharmacyByIdx("centre", state.ferieIdx);
-        lastFeriePharma = pharma.name;
-        lastFerieIdx = state.ferieIdx;
-        state.ferieIdx = (state.ferieIdx + 1) % PHARMACIES_CENTRE.length;
-      } else {
-        pharma = getPharmacyByIdx("centre", state.domingoIdx);
-        lastDomingoPharma = pharma.name;
-        lastDomingoIdx = state.domingoIdx;
-        state.domingoIdx =
-          (state.domingoIdx + 1) % PHARMACIES_CENTRE.length;
-      }
-
+      const { pharma, idx } = takeCentrePharmacy(state.centreIdx);
+      state.centreIdx = idx;
+      lastCentrePharma = pharma.name;
+      lastCentreIdx = (idx - 1 + PHARMACIES_CENTRE.length) % PHARMACIES_CENTRE.length;
       days.push(
         makeDay(planningYear, dateDebut, pharma.name, pharma.adresse, "weekend")
       );
       continue;
     }
 
+    // DIMANCHE → ligne vide (même pharmacie que le samedi)
     if (dow === 0) {
       days.push(makeDay(planningYear, dateDebut, "", "", "vide"));
       continue;
     }
 
+    // Jour férié (lun–ven) → Centre Albertville, type ferie
     if (isFerie) {
-      const pharma = getPharmacyByIdx("centre", state.ferieIdx);
-      lastFeriePharma = pharma.name;
-      lastFerieIdx = state.ferieIdx;
-      state.ferieIdx = (state.ferieIdx + 1) % PHARMACIES_CENTRE.length;
+      const { pharma, idx } = takeCentrePharmacy(state.centreIdx);
+      state.centreIdx = idx;
+      lastCentrePharma = pharma.name;
+      lastCentreIdx = (idx - 1 + PHARMACIES_CENTRE.length) % PHARMACIES_CENTRE.length;
       days.push(
-        makeDay(
-          planningYear,
-          dateDebut,
-          pharma.name,
-          pharma.adresse,
-          "ferie"
-        )
+        makeDay(planningYear, dateDebut, pharma.name, pharma.adresse, "ferie")
       );
       continue;
     }
 
+    // LUNDI normal → alternance Lauzière / Grand Arc
     if (dow === 1) {
       const pharma =
         state.lundiNext === "lauziere"
@@ -290,9 +295,9 @@ export function generatePlanning(
       continue;
     }
 
-    const semaineDay = assignSemaine(dateDebut, dow, feries, state);
-    if (semaineDay) {
-      days.push({ ...semaineDay, year: planningYear });
+    // MARDI–VENDREDI → extérieures
+    if (dow >= 2 && dow <= 5) {
+      days.push(assignSemaine(dateDebut, dow, state));
     }
   }
 
@@ -301,14 +306,17 @@ export function generatePlanning(
     (state.semaineIdx - 1 + PHARMACIES_EXTERIEURES.length) %
       PHARMACIES_EXTERIEURES.length;
 
+  const centreName =
+    lastCentrePharma ||
+    getPharmacyByIdx("centre", lastCentreIdx).name;
+
   return {
     days,
     finalState: {
-      last_ferie_pharma: lastFeriePharma || getPharmacyByIdx("centre", lastFerieIdx).name,
-      last_ferie_idx: lastFerieIdx,
-      last_domingo_pharma:
-        lastDomingoPharma || getPharmacyByIdx("centre", lastDomingoIdx).name,
-      last_domingo_idx: lastDomingoIdx,
+      last_ferie_pharma: centreName,
+      last_ferie_idx: lastCentreIdx,
+      last_domingo_pharma: centreName,
+      last_domingo_idx: lastCentreIdx,
       last_lundi_pharma:
         lastLundiPharma ||
         (config.lundiNext === "lauziere"

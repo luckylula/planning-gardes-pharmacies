@@ -78,11 +78,12 @@ function inferType(
   if (dow === 6) return "weekend";
   if (dow === 0) return "vide";
   if (isLauziere(pharmacie) || isGrandArc(pharmacie)) return "lundi";
-  const year = dateDebut.getFullYear();
-  const feries = getFeriesDates(year).map(dateKey);
-  if (feries.includes(dateKey(dateDebut))) return "ferie";
-  if (PHARMACIES_CENTRE.some((p) => p.name === pharmacie)) {
-    if (dow === 6 || dow === 0) return "weekend";
+  const feries = new Set([
+    ...getFeriesDates(dateDebut.getFullYear()).map(dateKey),
+    ...getFeriesDates(dateDebut.getFullYear() + 1).map(dateKey),
+    ...getFeriesDates(dateDebut.getFullYear() - 1).map(dateKey),
+  ]);
+  if (feries.has(dateKey(dateDebut)) && PHARMACIES_CENTRE.some((p) => p.name === pharmacie)) {
     return "ferie";
   }
   return "semaine";
@@ -144,16 +145,17 @@ export function analyzeImport(rows: ExcelRow[]): ImportSummary {
     const dow = date.getDay();
     const key = dateKey(date);
 
-    if (feriesSet.has(key) && PHARMACIES_CENTRE.some((p) => p.name === pharmacie)) {
-      lastFeriePharma = pharmacie;
+    if (
+      (feriesSet.has(key) || dow === 6) &&
+      PHARMACIES_CENTRE.some((p) => p.name === pharmacie)
+    ) {
       const idx = PHARMACIES_CENTRE.findIndex((p) => p.name === pharmacie);
-      if (idx >= 0) lastFerieIdx = idx;
-    }
-
-    if (dow === 6 && pharmacie) {
-      lastDomingoPharma = pharmacie;
-      const idx = PHARMACIES_CENTRE.findIndex((p) => p.name === pharmacie);
-      if (idx >= 0) lastDomingoIdx = idx;
+      if (idx >= 0) {
+        lastFerieIdx = idx;
+        lastDomingoIdx = idx;
+        lastFeriePharma = pharmacie;
+        lastDomingoPharma = pharmacie;
+      }
     }
 
     if (dow === 1 && (isLauziere(pharmacie) || isGrandArc(pharmacie))) {

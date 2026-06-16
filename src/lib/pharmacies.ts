@@ -8,6 +8,7 @@ export interface Pharmacy {
   needsTwoDays?: boolean;
 }
 
+/** Ordre de rotation unique week-ends + fériés (Norman) */
 export const PHARMACIES_CENTRE: Pharmacy[] = [
   {
     id: "belle-etoile",
@@ -22,27 +23,9 @@ export const PHARMACIES_CENTRE: Pharmacy[] = [
     group: "centre",
   },
   {
-    id: "centre",
-    name: "Pharmacie du Centre",
-    adresse: "42 rue de la République 73200 Albertville",
-    group: "centre",
-  },
-  {
     id: "parc-olympique",
     name: "Pharmacie du Parc Olympique",
     adresse: "99 avenue des XVI JO 73200 Albertville",
-    group: "centre",
-  },
-  {
-    id: "val-roses",
-    name: "Pharmacie du Val des Roses",
-    adresse: "458 rue Commandant Dubois 73200 Albertville",
-    group: "centre",
-  },
-  {
-    id: "pierre-roy",
-    name: "Pharmacie de la Pierre du Roy",
-    adresse: "70 chemin de la Pierre du Roy 73200 Albertville",
     group: "centre",
   },
   {
@@ -52,9 +35,27 @@ export const PHARMACIES_CENTRE: Pharmacy[] = [
     group: "centre",
   },
   {
+    id: "centre",
+    name: "Pharmacie du Centre",
+    adresse: "42 rue de la République 73200 Albertville",
+    group: "centre",
+  },
+  {
     id: "zakar",
     name: "Pharmacie Zakar",
     adresse: "24 rue de la République 73200 Albertville",
+    group: "centre",
+  },
+  {
+    id: "pierre-roy",
+    name: "Pharmacie de la Pierre du Roy",
+    adresse: "70 chemin de la Pierre du Roy 73200 Albertville",
+    group: "centre",
+  },
+  {
+    id: "val-roses",
+    name: "Pharmacie du Val des Roses",
+    adresse: "458 rue Commandant Dubois 73200 Albertville",
     group: "centre",
   },
 ];
@@ -169,11 +170,18 @@ export function isTwoDayPharmacy(pharmacy: Pharmacy): boolean {
 }
 
 export function isLauziere(name: string): boolean {
-  return name.toLowerCase().includes("lauzière") || name.toLowerCase().includes("lauziere");
+  return (
+    name.toLowerCase().includes("lauzière") ||
+    name.toLowerCase().includes("lauziere")
+  );
 }
 
 export function isGrandArc(name: string): boolean {
   return name.toLowerCase().includes("grand arc");
+}
+
+export function isCentrePharmacy(name: string): boolean {
+  return PHARMACIES_CENTRE.some((p) => p.name === name);
 }
 
 export function getNextLundiPharmacy(lastLundi: string): Pharmacy {

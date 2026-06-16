@@ -15,19 +15,24 @@ export async function GET(req: NextRequest) {
   });
 
   if (!prevConfig) {
+    const centreStartIdx = year === 2027 ? 3 : 0;
+    const lundiNext = year === 2027 ? ("grand_arc" as const) : ("lauziere" as const);
     return NextResponse.json({
       year,
       hasPrevious: false,
       defaults: {
-        ferieStartIdx: 0,
-        domingoStartIdx: 0,
-        lundiNext: "lauziere" as const,
+        centreStartIdx,
+        ferieStartIdx: centreStartIdx,
+        domingoStartIdx: centreStartIdx,
+        lundiNext,
         semaineStartIdx: 0,
       },
       labels: {
-        ferieNext: getPharmacyByIdx("centre", 0).name,
-        domingoNext: getPharmacyByIdx("centre", 0).name,
-        lundiNext: PHARMACIES_MAURIENNE[0].name,
+        centreNext: getPharmacyByIdx("centre", centreStartIdx).name,
+        lundiNext:
+          lundiNext === "lauziere"
+            ? PHARMACIES_MAURIENNE[0].name
+            : PHARMACIES_MAURIENNE[1].name,
         semaineNext: getPharmacyByIdx("exterieures", 0).name,
       },
     });
@@ -40,8 +45,7 @@ export async function GET(req: NextRequest) {
     previousYear: prevConfig.year,
     defaults: config,
     labels: {
-      ferieNext: getPharmacyByIdx("centre", config.ferieStartIdx).name,
-      domingoNext: getPharmacyByIdx("centre", config.domingoStartIdx).name,
+      centreNext: getPharmacyByIdx("centre", config.centreStartIdx).name,
       lundiNext:
         config.lundiNext === "lauziere"
           ? PHARMACIES_MAURIENNE[0].name

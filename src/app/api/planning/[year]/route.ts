@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { generatePlanning } from "@/lib/generatePlanning";
+import { generatePlanning, normalizeGenerateConfig } from "@/lib/generatePlanning";
 import { getPharmacyByIdx, PHARMACIES_MAURIENNE } from "@/lib/pharmacies";
-import type { GenerateConfig } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -26,12 +25,13 @@ export async function POST(
   const year = parseInt(params.year, 10);
   const body = await req.json();
 
-  const config: GenerateConfig = {
-    ferieStartIdx: body.ferieStartIdx ?? 0,
-    domingoStartIdx: body.domingoStartIdx ?? 0,
-    lundiNext: body.lundiNext ?? "lauziere",
-    semaineStartIdx: body.semaineStartIdx ?? 0,
-  };
+  const config = normalizeGenerateConfig({
+    centreStartIdx: body.centreStartIdx,
+    ferieStartIdx: body.ferieStartIdx,
+    domingoStartIdx: body.domingoStartIdx,
+    lundiNext: body.lundiNext,
+    semaineStartIdx: body.semaineStartIdx,
+  });
 
   const { days, finalState } = generatePlanning(year, config);
 

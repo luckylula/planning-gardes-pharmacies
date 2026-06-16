@@ -19,6 +19,7 @@ export interface PlanningDayInput {
 }
 
 export interface GenerateConfig {
+  centreStartIdx: number;
   ferieStartIdx: number;
   domingoStartIdx: number;
   lundiNext: "lauziere" | "grand_arc";

@@ -14,14 +14,14 @@ interface GeneratePreview {
   hasPrevious: boolean;
   previousYear?: number;
   defaults: {
+    centreStartIdx: number;
     ferieStartIdx: number;
     domingoStartIdx: number;
     lundiNext: "lauziere" | "grand_arc";
     semaineStartIdx: number;
   };
   labels: {
-    ferieNext: string;
-    domingoNext: string;
+    centreNext: string;
     lundiNext: string;
     semaineNext: string;
   };
@@ -32,9 +32,10 @@ export default function GeneratePage() {
   const [year, setYear] = useState(new Date().getFullYear() + 1);
   const [preview, setPreview] = useState<GeneratePreview | null>(null);
   const [config, setConfig] = useState({
+    centreStartIdx: 0,
     ferieStartIdx: 0,
     domingoStartIdx: 0,
-    lundiNext: "lauziere" as "lauziere" | "grand_arc",
+    lundiNext: "grand_arc" as "lauziere" | "grand_arc",
     semaineStartIdx: 0,
   });
   const [loading, setLoading] = useState(false);
@@ -100,44 +101,25 @@ export default function GeneratePage() {
             <div className="space-y-4">
               <div>
                 <label className="mb-1 block text-sm font-medium">
-                  Rotation fériés — prochain :{" "}
+                  Rotation Albertville (week-ends + fériés) — prochain :{" "}
                   <span className="text-blue-600">
-                    {PHARMACIES_CENTRE[config.ferieStartIdx]?.name}
+                    {PHARMACIES_CENTRE[config.centreStartIdx]?.name}
                   </span>
                 </label>
                 <input
                   type="range"
                   min={0}
                   max={7}
-                  value={config.ferieStartIdx}
-                  onChange={(e) =>
+                  value={config.centreStartIdx}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10);
                     setConfig((c) => ({
                       ...c,
-                      ferieStartIdx: parseInt(e.target.value, 10),
-                    }))
-                  }
-                  className="w-full"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium">
-                  Rotation dimanches — prochain :{" "}
-                  <span className="text-blue-600">
-                    {PHARMACIES_CENTRE[config.domingoStartIdx]?.name}
-                  </span>
-                </label>
-                <input
-                  type="range"
-                  min={0}
-                  max={7}
-                  value={config.domingoStartIdx}
-                  onChange={(e) =>
-                    setConfig((c) => ({
-                      ...c,
-                      domingoStartIdx: parseInt(e.target.value, 10),
-                    }))
-                  }
+                      centreStartIdx: v,
+                      ferieStartIdx: v,
+                      domingoStartIdx: v,
+                    }));
+                  }}
                   className="w-full"
                 />
               </div>
