@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db";
 import { generatePlanning, normalizeGenerateConfig } from "@/lib/generatePlanning";
 import { getPharmacyByIdx, PHARMACIES_MAURIENNE } from "@/lib/pharmacies";
 
+import { computeStatsFromDb, enrichVideDaysFromWeekend } from "@/lib/excel";
+
 export const dynamic = "force-dynamic";
 
 export async function GET(
@@ -10,12 +12,15 @@ export async function GET(
   { params }: { params: { year: string } }
 ) {
   const year = parseInt(params.year, 10);
-  const days = await prisma.planningDay.findMany({
+  const rawDays = await prisma.planningDay.findMany({
     where: { year },
     orderBy: { date: "asc" },
   });
+
+  const days = enrichVideDaysFromWeekend(rawDays);
   const config = await prisma.yearConfig.findUnique({ where: { year } });
-  return NextResponse.json({ days, config });
+  const stats = await computeStatsFromDb(year);
+  return NextResponse.json({ days, config, stats });
 }
 
 export async function POST(

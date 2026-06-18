@@ -1,11 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import PlanningTable, { type PlanningDayRow } from "@/components/PlanningTable";
 import StatsPanel from "@/components/StatsPanel";
 import ExportButton from "@/components/ExportButton";
-import { computeStats } from "@/lib/excel";
 import type { PharmacyStats } from "@/lib/types";
 
 export default function PlanningPage({
@@ -45,20 +45,7 @@ export default function PlanningPage({
     );
     setDays(rows);
     setMarkedDone(data.config?.generated ?? false);
-    setStats(
-      computeStats(
-        rows.map((r) => ({
-          year,
-          date: new Date(r.date),
-          heure_debut: "19h15",
-          date_fin: new Date(r.date_fin),
-          heure_fin: "19h15",
-          pharmacie: r.pharmacie,
-          adresse: r.adresse,
-          type: r.type as "ferie" | "weekend" | "lundi" | "semaine" | "vide",
-        }))
-      )
-    );
+    setStats(data.stats ?? []);
     setLoading(false);
   }, [year]);
 
@@ -131,6 +118,12 @@ export default function PlanningPage({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link
+            href={`/planning/${year}/rotations`}
+            className="rounded-lg border border-indigo-300 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-800 hover:bg-indigo-100"
+          >
+            Voir les rotations
+          </Link>
           <ExportButton year={year} />
           {!markedDone && (
             <button

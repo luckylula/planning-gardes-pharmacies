@@ -146,14 +146,123 @@ export const ALL_PHARMACIES: Pharmacy[] = [
   ...PHARMACIES_EXTERIEURES,
 ];
 
+/** Cycle de 18 tours — 8 pharmacies × 2 + Mercury/Fina × 1 (2 jours chacune) */
+export interface ExterieuresCycleSlot {
+  pharmacyId: string;
+  dias: 1 | 2;
+}
+
+export const ROTATION_EXTERIEURES_CYCLE: ExterieuresCycleSlot[] = [
+  { pharmacyId: "gelon", dias: 1 },
+  { pharmacyId: "rond-point", dias: 1 },
+  { pharmacyId: "gresy", dias: 1 },
+  { pharmacyId: "mercury", dias: 2 },
+  { pharmacyId: "mont-charvin", dias: 1 },
+  { pharmacyId: "gilly", dias: 1 },
+  { pharmacyId: "bathie", dias: 1 },
+  { pharmacyId: "chef-lieu", dias: 1 },
+  { pharmacyId: "laconnay", dias: 1 },
+  { pharmacyId: "fina-tardy", dias: 2 },
+  { pharmacyId: "gelon", dias: 1 },
+  { pharmacyId: "rond-point", dias: 1 },
+  { pharmacyId: "gresy", dias: 1 },
+  { pharmacyId: "mont-charvin", dias: 1 },
+  { pharmacyId: "gilly", dias: 1 },
+  { pharmacyId: "bathie", dias: 1 },
+  { pharmacyId: "chef-lieu", dias: 1 },
+  { pharmacyId: "laconnay", dias: 1 },
+];
+
+export const ROTATION_EXTERIEURES_CYCLE_LENGTH =
+  ROTATION_EXTERIEURES_CYCLE.length;
+
+const pharmacyById = new Map(ALL_PHARMACIES.map((p) => [p.id, p]));
+
+export function getExterieuresCycleSlot(cycleIdx: number): {
+  pharma: Pharmacy;
+  dias: 1 | 2;
+} {
+  const len = ROTATION_EXTERIEURES_CYCLE_LENGTH;
+  const slot =
+    ROTATION_EXTERIEURES_CYCLE[
+      ((cycleIdx % len) + len) % len
+    ];
+  const pharma = pharmacyById.get(slot.pharmacyId);
+  if (!pharma) {
+    throw new Error(`Unknown pharmacy id in cycle: ${slot.pharmacyId}`);
+  }
+  return { pharma, dias: slot.dias };
+}
+
+export function nextExterieuresCycleIdx(cycleIdx: number): number {
+  return (cycleIdx + 1) % ROTATION_EXTERIEURES_CYCLE_LENGTH;
+}
+
+/** Prochain tour d'1 jour dans le cycle (substitution quand Mercury/Fina reportés). */
+export function nextOneDayCycleIdx(fromIdx: number): number {
+  let idx = nextExterieuresCycleIdx(fromIdx);
+  let guard = 0;
+  while (
+    ROTATION_EXTERIEURES_CYCLE[idx].dias === 2 &&
+    guard < ROTATION_EXTERIEURES_CYCLE_LENGTH
+  ) {
+    idx = nextExterieuresCycleIdx(idx);
+    guard++;
+  }
+  return idx;
+}
+
+function pharmacySearchKey(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/^ph(?:ie|armacie)\s+/i, "")
+    .replace(/^(?:de la |du |de |d'|des )/i, "")
+    .replace(/\s+\d+.*$/, "")
+    .trim();
+}
+
 export function findPharmacy(name: string): Pharmacy | undefined {
   const normalized = name.trim().toLowerCase();
-  return ALL_PHARMACIES.find(
+  if (!normalized) return undefined;
+
+  const direct = ALL_PHARMACIES.find(
     (p) =>
       p.name.toLowerCase() === normalized ||
       p.name.toLowerCase().includes(normalized) ||
       normalized.includes(p.name.toLowerCase())
   );
+  if (direct) return direct;
+
+  const searchKey = pharmacySearchKey(name);
+  if (!searchKey) return undefined;
+
+  return ALL_PHARMACIES.find((p) => {
+    const pKey = pharmacySearchKey(p.name);
+    return (
+      searchKey.includes(pKey) ||
+      pKey.includes(searchKey) ||
+      searchKey.includes(p.id.replace(/-/g, " "))
+    );
+  });
+}
+
+export function findCycleIdxForPharmacy(
+  pharmacyName: string,
+  afterIdx = -1
+): number {
+  const pharma = findPharmacy(pharmacyName);
+  if (!pharma) return 0;
+  const start = nextExterieuresCycleIdx(afterIdx);
+  for (let i = 0; i < ROTATION_EXTERIEURES_CYCLE_LENGTH; i++) {
+    const idx = (start + i) % ROTATION_EXTERIEURES_CYCLE_LENGTH;
+    if (ROTATION_EXTERIEURES_CYCLE[idx].pharmacyId === pharma.id) {
+      return idx;
+    }
+  }
+  return 0;
 }
 
 export function getPharmacyByIdx(

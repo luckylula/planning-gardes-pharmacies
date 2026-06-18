@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import YearSelector from "@/components/YearSelector";
 import {
   PHARMACIES_CENTRE,
-  PHARMACIES_EXTERIEURES,
   PHARMACIES_MAURIENNE,
+  getExterieuresCycleSlot,
+  ROTATION_EXTERIEURES_CYCLE_LENGTH,
 } from "@/lib/pharmacies";
 
 interface GeneratePreview {
@@ -151,13 +152,13 @@ export default function GeneratePage() {
                 <label className="mb-1 block text-sm font-medium">
                   Extérieures — prochain :{" "}
                   <span className="text-green-600">
-                    {PHARMACIES_EXTERIEURES[config.semaineStartIdx]?.name}
+                    {getExterieuresCycleSlot(config.semaineStartIdx).pharma.name}
                   </span>
                 </label>
                 <input
                   type="range"
                   min={0}
-                  max={9}
+                  max={ROTATION_EXTERIEURES_CYCLE_LENGTH - 1}
                   value={config.semaineStartIdx}
                   onChange={(e) =>
                     setConfig((c) => ({

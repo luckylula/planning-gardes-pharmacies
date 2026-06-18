@@ -119,7 +119,13 @@ export default function PlanningTable({
                     {getDayNameFR(d)}
                   </td>
                   <td className="px-3 py-2.5">
-                    <span className="line-clamp-2">
+                    <span
+                      className={`line-clamp-2 ${
+                        day.type === "vide"
+                          ? "text-sm italic text-gray-400"
+                          : ""
+                      }`}
+                    >
                       {day.pharmacie || "—"}
                     </span>
                   </td>
@@ -129,13 +135,15 @@ export default function PlanningTable({
                     </span>
                   </td>
                   <td className="px-3 py-2.5 text-right">
-                    <button
-                      type="button"
-                      onClick={() => setEditing(day)}
-                      className="rounded-md bg-white/80 px-2 py-1 text-xs font-medium shadow-sm hover:bg-white"
-                    >
-                      Modifier
-                    </button>
+                    {day.type !== "vide" && (
+                      <button
+                        type="button"
+                        onClick={() => setEditing(day)}
+                        className="rounded-md bg-white/80 px-2 py-1 text-xs font-medium shadow-sm hover:bg-white"
+                      >
+                        Modifier
+                      </button>
+                    )}
                   </td>
                 </tr>
               );

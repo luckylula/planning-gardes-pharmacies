@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { planningDaysToExcel } from "@/lib/excel";
+import { enrichVideDaysFromWeekend, planningDaysToExcel } from "@/lib/excel";
+import { getYearRotations } from "@/lib/rotations";
 
 export const dynamic = "force-dynamic";
 
@@ -9,12 +10,15 @@ export async function GET(
   { params }: { params: { year: string } }
 ) {
   const year = parseInt(params.year, 10);
-  const days = await prisma.planningDay.findMany({
+  const rawDays = await prisma.planningDay.findMany({
     where: { year },
     orderBy: { date: "asc" },
   });
 
-  const buffer = planningDaysToExcel(
+  const days = enrichVideDaysFromWeekend(rawDays);
+  const rotations = await getYearRotations(year);
+
+  const buffer = await planningDaysToExcel(
     days.map((d) => ({
       year: d.year,
       date: d.date,
@@ -25,7 +29,8 @@ export async function GET(
       adresse: d.adresse,
       type: d.type as "ferie" | "weekend" | "lundi" | "semaine" | "vide",
     })),
-    year
+    year,
+    rotations
   );
 
   return new NextResponse(buffer, {

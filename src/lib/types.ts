@@ -5,6 +5,9 @@ export type PlanningDayType =
   | "semaine"
   | "vide";
 
+/** Rotation centre utilisée pour assigner la pharmacie (fériés vs dimanches). */
+export type CentreRotation = "ferie" | "domingo";
+
 export interface PlanningDayInput {
   year: number;
   date: Date;
@@ -14,6 +17,7 @@ export interface PlanningDayInput {
   pharmacie: string;
   adresse: string;
   type: PlanningDayType;
+  centreRotation?: CentreRotation;
   modified?: boolean;
   note?: string;
 }
@@ -46,8 +50,20 @@ export interface ImportSummary {
   totalRows: number;
 }
 
+export interface CategoryStats {
+  turnos: number;
+  gardesJour: number;
+  gardesNuit: number;
+}
+
 export interface PharmacyStats {
   name: string;
   group: string;
-  count: number;
+  ferie: CategoryStats;
+  weekend: CategoryStats;
+  lundi: CategoryStats;
+  semaine: CategoryStats;
+  totalTurnos: number;
+  totalGardesJour: number;
+  totalGardesNuit: number;
 }
