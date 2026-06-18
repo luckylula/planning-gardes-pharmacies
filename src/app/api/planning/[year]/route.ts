@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { generatePlanning, normalizeGenerateConfig } from "@/lib/generatePlanning";
 import { getPharmacyByIdx, PHARMACIES_MAURIENNE } from "@/lib/pharmacies";
@@ -89,13 +90,17 @@ export async function DELETE(
   { params }: { params: { year: string } }
 ) {
   const year = parseInt(params.year, 10);
-  await prisma.planningDay.deleteMany({ where: { year } });
-  const existing = await prisma.yearConfig.findUnique({ where: { year } });
-  if (existing) {
-    await prisma.yearConfig.update({
+
+  await prisma.$transaction([
+    prisma.planningDay.deleteMany({ where: { year } }),
+    prisma.yearConfig.updateMany({
       where: { year },
       data: { generated: false },
-    });
-  }
+    }),
+  ]);
+
+  revalidatePath("/");
+  revalidatePath(`/planning/${year}`);
+
   return NextResponse.json({ success: true });
 }

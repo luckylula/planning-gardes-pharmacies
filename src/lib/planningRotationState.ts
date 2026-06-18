@@ -12,6 +12,7 @@ import {
   configFromYearConfig,
   getFeriesDates,
   normalizeGenerateConfig,
+  collectRelevantFerieDates,
 } from "./generatePlanning";
 import type { GenerateConfig, PlanningDayInput, YearConfigState } from "./types";
 
@@ -80,28 +81,16 @@ export function findFerieRotationForDate(
   return candidates[0] ?? null;
 }
 
-function updatesDomingoRotation(
-  day: Pick<PlanningDayInput, "date" | "type" | "heure_debut" | "pharmacie">
-): boolean {
-  if (!day.pharmacie || !isCentrePharmacy(day.pharmacie)) return false;
-  if (day.date.getDay() === 6 && day.type === "weekend") return true;
-  if (day.type === "ferie" && day.heure_debut === "09h00") return true;
-  return false;
-}
-
 function feriesInPlanningWindow(
   year: number,
   days: PlanningDayInput[]
 ): Date[] {
   if (days.length === 0) return [];
-  const start = days[0].date.getTime();
-  const end = days[days.length - 1].date.getTime();
-  return getFeriesDates(year)
-    .filter((f) => {
-      const t = f.getTime();
-      return t >= start && t <= end;
-    })
-    .sort((a, b) => a.getTime() - b.getTime());
+  const start = days[0].date;
+  const end = days[days.length - 1].date;
+  return collectRelevantFerieDates(start, end).sort(
+    (a, b) => a.getTime() - b.getTime()
+  );
 }
 
 /**
@@ -134,6 +123,23 @@ function daysInCalendarYear(
   return days.filter((d) => d.date.getFullYear() === year);
 }
 
+function isFerieRotationAssignment(
+  day: Pick<PlanningDayInput, "type" | "heure_debut" | "centreRotation">
+): boolean {
+  if (day.type !== "ferie") return false;
+  if (day.centreRotation) return day.centreRotation === "ferie";
+  return day.heure_debut !== "09h00";
+}
+
+function isWeekendRotationAssignment(
+  day: Pick<PlanningDayInput, "type" | "heure_debut" | "centreRotation">
+): boolean {
+  if (day.type === "weekend") return true;
+  if (day.type === "ferie" && day.centreRotation === "domingo") return true;
+  if (day.type === "ferie" && day.heure_debut === "09h00") return true;
+  return false;
+}
+
 /** État de fin d'année déduit des dernières gardes réelles du planning. */
 export function inferEndStateFromPlanningDays(
   days: PlanningDayInput[],
@@ -149,6 +155,7 @@ export function inferEndStateFromPlanningDays(
   let lastLundiPharma = PHARMACIES_MAURIENNE[0].name;
   let lastSemaineIdx = 0;
 
+  let calendarFerie: { idx: number; pharma: string; date: Date } | null = null;
   for (const ferieDate of feriesInPlanningWindow(year, inYear)) {
     const guard = findFerieRotationForDate(sorted, ferieDate);
     const fromCalendar = pharmacieAtCalendarDate(sorted, ferieDate);
@@ -156,30 +163,73 @@ export function inferEndStateFromPlanningDays(
     if (name && isCentrePharmacy(name)) {
       const idx = centreIdx(name);
       if (idx >= 0) {
-        lastFerieIdx = idx;
-        lastFeriePharma = name;
+        calendarFerie = { idx, pharma: name, date: ferieDate };
       }
     }
   }
 
+  let rowFerie: { idx: number; pharma: string; date: Date } | null = null;
   for (const day of inYear) {
-    if (!day.pharmacie) continue;
-
-    if (updatesDomingoRotation(day)) {
+    if (
+      isFerieRotationAssignment(day) &&
+      day.pharmacie &&
+      isCentrePharmacy(day.pharmacie)
+    ) {
       const idx = centreIdx(day.pharmacie);
       if (idx >= 0) {
-        lastDomingoIdx = idx;
-        lastDomingoPharma = day.pharmacie;
+        rowFerie = { idx, pharma: day.pharmacie, date: day.date };
       }
     }
+  }
 
-    if (day.date.getDay() === 6 && day.pharmacie && isCentrePharmacy(day.pharmacie)) {
+  const ferieEnd =
+    rowFerie &&
+    (!calendarFerie || rowFerie.date.getTime() > calendarFerie.date.getTime())
+      ? rowFerie
+      : calendarFerie;
+  if (ferieEnd) {
+    lastFerieIdx = ferieEnd.idx;
+    lastFeriePharma = ferieEnd.pharma;
+  }
+
+  let calendarDomingo: { idx: number; pharma: string; date: Date } | null = null;
+  for (const day of inYear) {
+    if (
+      day.date.getDay() === 6 &&
+      day.type === "weekend" &&
+      day.pharmacie &&
+      isCentrePharmacy(day.pharmacie)
+    ) {
       const idx = centreIdx(day.pharmacie);
       if (idx >= 0) {
-        lastDomingoIdx = idx;
-        lastDomingoPharma = day.pharmacie;
+        calendarDomingo = { idx, pharma: day.pharmacie, date: day.date };
       }
     }
+  }
+
+  let rowDomingo: { idx: number; pharma: string; date: Date } | null = null;
+  for (const day of inYear) {
+    if (
+      isWeekendRotationAssignment(day) &&
+      day.pharmacie &&
+      isCentrePharmacy(day.pharmacie)
+    ) {
+      const idx = centreIdx(day.pharmacie);
+      if (idx >= 0) {
+        rowDomingo = { idx, pharma: day.pharmacie, date: day.date };
+      }
+    }
+  }
+
+  const domingoEnd =
+    rowDomingo &&
+    (!calendarDomingo ||
+      rowDomingo.date.getTime() > calendarDomingo.date.getTime())
+      ? rowDomingo
+      : calendarDomingo ?? rowDomingo;
+  if (domingoEnd) {
+    lastDomingoIdx = domingoEnd.idx;
+    lastDomingoPharma = domingoEnd.pharma;
   }
 
   for (const day of inYear) {

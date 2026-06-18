@@ -1,15 +1,32 @@
 import Link from "next/link";
+import { unstable_noStore as noStore } from "next/cache";
 import { prisma } from "@/lib/db";
+import HomePharmacyCards from "@/components/HomePharmacyCards";
+import { getBaselineRotations } from "@/lib/rotations";
+import { getOldestYear } from "@/lib/years";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
+  noStore();
+
   let years: Awaited<ReturnType<typeof prisma.yearConfig.findMany>> = [];
   try {
     years = await prisma.yearConfig.findMany({ orderBy: { year: "desc" } });
   } catch {
     years = [];
   }
+
+  const yearsWithCounts = await Promise.all(
+    years.map(async (y) => ({
+      ...y,
+      dayCount: await prisma.planningDay.count({ where: { year: y.year } }),
+    }))
+  );
+
+  const oldestYear = await getOldestYear();
+  const baseline =
+    oldestYear != null ? await getBaselineRotations(oldestYear) : null;
 
   return (
     <div>
@@ -49,7 +66,9 @@ export default async function HomePage() {
           </p>
         ) : (
           <ul className="divide-y divide-gray-100">
-            {years.map((y) => (
+            {yearsWithCounts.map((y) => {
+              const hasPlanning = y.dayCount > 0;
+              return (
               <li
                 key={y.year}
                 className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"
@@ -57,7 +76,7 @@ export default async function HomePage() {
                 <div>
                   <span className="text-lg font-bold">{y.year}</span>
                   <span className="ml-3 text-sm">
-                    {y.generated ? (
+                    {hasPlanning ? (
                       <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-800">
                         Généré
                       </span>
@@ -69,37 +88,25 @@ export default async function HomePage() {
                   </span>
                 </div>
                 <Link
-                  href={`/planning/${y.year}`}
+                  href={hasPlanning ? `/planning/${y.year}` : "/generate"}
                   className="text-sm font-medium text-blue-600 hover:underline"
                 >
-                  Voir le planning →
+                  {hasPlanning ? "Voir le planning →" : "Générer →"}
                 </Link>
               </li>
-            ))}
+            );
+            })}
           </ul>
         )}
       </section>
 
-      <section className="mt-8 grid gap-4 sm:grid-cols-3">
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-          <h3 className="font-semibold text-blue-900">Centre Albertville</h3>
-          <p className="mt-1 text-sm text-blue-800">
-            8 pharmacies — week-ends et jours fériés
-          </p>
-        </div>
-        <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4">
-          <h3 className="font-semibold text-yellow-900">Maurienne</h3>
-          <p className="mt-1 text-sm text-yellow-800">
-            2 pharmacies — lundis en alternance
-          </p>
-        </div>
-        <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-          <h3 className="font-semibold text-green-900">Extérieures</h3>
-          <p className="mt-1 text-sm text-green-800">
-            10 pharmacies — mardi au vendredi
-          </p>
-        </div>
-      </section>
+      <HomePharmacyCards
+        oldestYear={oldestYear}
+        ferie={baseline?.ferie ?? []}
+        domingo={baseline?.domingo ?? []}
+        lundi={baseline?.lundi ?? []}
+        semaine={baseline?.semaine ?? []}
+      />
     </div>
   );
 }

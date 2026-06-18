@@ -79,9 +79,12 @@ export default function PlanningPage({
     )
       return;
     setResetting(true);
-    await fetch(`/api/planning/${year}`, { method: "DELETE" });
+    const res = await fetch(`/api/planning/${year}`, { method: "DELETE" });
     setResetting(false);
-    router.push("/generate");
+    if (res.ok) {
+      router.refresh();
+      router.push("/");
+    }
   };
 
   if (loading) {

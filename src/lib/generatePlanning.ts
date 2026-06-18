@@ -23,7 +23,8 @@ import type {
 
 const HEURE = "19h15";
 const HEURE_DIMANCHE_MATIN = "09h00";
-const PLANNING_DAYS = 364;
+/** Durée nominale du planning Norman (52 semaines). */
+export const BASE_PLANNING_DAYS = 364;
 
 /** Algorithme de Oudin (1940) — calcul fiable de Pâques */
 export function getEaster(year: number): Date {
@@ -176,6 +177,27 @@ function buildFerieSchedule(ferieDate: Date): {
   return { guards: [], absorbed: [] };
 }
 
+/** Fériés dont au moins une garde (date de début) tombe dans [start, end]. */
+export function collectRelevantFerieDates(start: Date, end: Date): Date[] {
+  const yearStart = start.getFullYear();
+  const yearEnd = end.getFullYear();
+  const ferieDates: Date[] = [
+    ...getFeriesDates(yearStart),
+    ...(yearEnd !== yearStart ? getFeriesDates(yearEnd) : []),
+    utcDate(yearStart + 1, 1, 1),
+  ];
+  const uniqueFerieDates = ferieDates.filter(
+    (d, i, arr) =>
+      arr.findIndex((x) => dateKey(x) === dateKey(d)) === i
+  );
+
+  return uniqueFerieDates.filter((ferieDate) => {
+    if (ferieDate >= start && ferieDate <= end) return true;
+    const { guards } = buildFerieSchedule(ferieDate);
+    return guards.some((g) => g.debut >= start && g.debut <= end);
+  });
+}
+
 function collectFerieSchedules(
   start: Date,
   end: Date
@@ -186,20 +208,7 @@ function collectFerieSchedules(
   const guardsByDebut = new Map<string, ScheduledGuard[]>();
   const absorbedSlots = new Set<string>();
 
-  const yearStart = start.getFullYear();
-  const yearEnd = end.getFullYear();
-  const ferieDates: Date[] = [
-    ...getFeriesDates(yearStart),
-    ...(yearEnd !== yearStart ? getFeriesDates(yearEnd) : []),
-  ];
-  const uniqueFerieDates = ferieDates.filter(
-    (d, i, arr) =>
-      arr.findIndex((x) => dateKey(x) === dateKey(d)) === i
-  );
-
-  for (const ferieDate of uniqueFerieDates) {
-    if (ferieDate < start || ferieDate > end) continue;
-
+  for (const ferieDate of collectRelevantFerieDates(start, end)) {
     const { guards, absorbed } = buildFerieSchedule(ferieDate);
     const inRangeGuards = guards.filter(
       (g) => g.debut >= start && g.debut <= end
@@ -462,13 +471,42 @@ function isLauziereName(name: string): boolean {
   return n.includes("lauzière") || n.includes("lauziere");
 }
 
+/**
+ * Bornes du planning : 364 jours, prolongés d'au plus quelques jours si le
+ * pont férié du Jour de l'An (Y+1) commence après la fin nominale (ex. 31/12).
+ */
+export function planningBoundsForYear(year: number): {
+  start: Date;
+  end: Date;
+  dayCount: number;
+} {
+  const start = getFirstMondayOfJanuary(year);
+  const baseEnd = addDays(start, BASE_PLANNING_DAYS - 1);
+  let end = baseEnd;
+
+  const ny = utcDate(year + 1, 1, 1);
+  const { guards } = buildFerieSchedule(ny);
+  for (const guard of guards) {
+    if (guard.rotation !== "ferie" || guard.heure_debut === HEURE_DIMANCHE_MATIN) {
+      continue;
+    }
+    if (guard.debut > end && guard.debut.getFullYear() === year) {
+      end = guard.debut;
+    }
+  }
+
+  const extraDays = Math.round(
+    (end.getTime() - baseEnd.getTime()) / (24 * 60 * 60 * 1000)
+  );
+  return { start, end, dayCount: BASE_PLANNING_DAYS + extraDays };
+}
+
 export function generatePlanning(
   year: number,
   rawConfig: GenerateConfig
 ): { days: PlanningDayInput[]; finalState: YearConfigState } {
   const config = normalizeGenerateConfig(rawConfig);
-  const start = getFirstMondayOfJanuary(year);
-  const end = addDays(start, PLANNING_DAYS - 1);
+  const { start, end, dayCount } = planningBoundsForYear(year);
   const { guardsByDebut, absorbedSlots } = collectFerieSchedules(start, end);
 
   const days: PlanningDayInput[] = [];
@@ -490,7 +528,7 @@ export function generatePlanning(
   };
   let lastLundiPharma = "";
 
-  for (let i = 0; i < PLANNING_DAYS; i++) {
+  for (let i = 0; i < dayCount; i++) {
     const dateDebut = addDays(start, i);
     const key = dateKey(dateDebut);
     const dow = dateDebut.getDay();

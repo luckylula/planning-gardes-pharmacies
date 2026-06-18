@@ -17,6 +17,12 @@ export default function NavBar() {
           <Link href="/generate" className="text-gray-600 hover:text-blue-600">
             Générer
           </Link>
+          <Link
+            href="/configuration/rotations"
+            className="text-gray-600 hover:text-blue-600"
+          >
+            Rotations
+          </Link>
         </div>
       </div>
     </nav>

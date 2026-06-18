@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { configFromYearConfig } from "@/lib/generatePlanning";
-import { enrichVideDaysFromWeekend } from "@/lib/excel";
+import { defaultRotationConfig } from "@/lib/planningRotationState";
+import { resolveStartConfigFromPreviousYear } from "@/lib/rotations";
 import {
-  configForYearFromPreviousPlanning,
-  defaultRotationConfig,
-} from "@/lib/planningRotationState";
-import { getPharmacyByIdx, getExterieuresCycleSlot, PHARMACIES_MAURIENNE } from "@/lib/pharmacies";
-import type { PlanningDayInput } from "@/lib/types";
+  getPharmacyByIdx,
+  getExterieuresCycleSlot,
+  PHARMACIES_MAURIENNE,
+} from "@/lib/pharmacies";
 
 export const dynamic = "force-dynamic";
 
@@ -19,14 +19,10 @@ async function defaultsForYear(year: number) {
   });
 
   if (prevDays.length > 0) {
-    const days = enrichVideDaysFromWeekend(prevDays).map((d) => ({
-      ...d,
-      type: d.type as PlanningDayInput["type"],
-    }));
     return {
       hasPrevious: true,
       previousYear: prevYear,
-      defaults: configForYearFromPreviousPlanning(days, prevYear),
+      defaults: await resolveStartConfigFromPreviousYear(prevYear),
     };
   }
 
@@ -52,7 +48,9 @@ async function defaultsForYear(year: number) {
 
 export async function GET(req: NextRequest) {
   const yearParam = req.nextUrl.searchParams.get("year");
-  const year = yearParam ? parseInt(yearParam, 10) : new Date().getFullYear() + 1;
+  const year = yearParam
+    ? parseInt(yearParam, 10)
+    : new Date().getFullYear() + 1;
 
   const { hasPrevious, previousYear, defaults } = await defaultsForYear(year);
 
@@ -84,7 +82,8 @@ export async function GET(req: NextRequest) {
         defaults.lundiNext === "lauziere"
           ? PHARMACIES_MAURIENNE[0].name
           : PHARMACIES_MAURIENNE[1].name,
-      semaineNext: getExterieuresCycleSlot(defaults.semaineStartIdx).pharma.name,
+      semaineNext: getExterieuresCycleSlot(defaults.semaineStartIdx).pharma
+        .name,
     },
   });
 }
