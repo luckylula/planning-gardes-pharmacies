@@ -7,11 +7,13 @@ function shortName(name: string) {
   return name.replace(/^Pharmacie (de la |du |de |d'|Des? )?/i, "");
 }
 
-function moveItem<T>(list: T[], from: number, direction: -1 | 1): T[] {
-  const to = from + direction;
-  if (to < 0 || to >= list.length) return list;
+function reorderList<T>(list: T[], from: number, to: number): T[] {
+  if (from === to || from < 0 || to < 0 || from >= list.length || to >= list.length) {
+    return list;
+  }
   const next = [...list];
-  [next[from], next[to]] = [next[to], next[from]];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
   return next;
 }
 
@@ -36,8 +38,32 @@ function EditableList({
   cardClass: string;
   badgeClass: string;
 }) {
-  const move = (index: number, direction: -1 | 1) => {
-    onChange(renumber(moveItem(entries, index, direction)));
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+    setOverIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (draggedIndex !== null && index !== overIndex) {
+      setOverIndex(index);
+    }
+  };
+
+  const handleDrop = (index: number) => {
+    if (draggedIndex === null) return;
+    onChange(renumber(reorderList(entries, draggedIndex, index)));
+    setDraggedIndex(null);
+    setOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setOverIndex(null);
   };
 
   return (
@@ -45,46 +71,58 @@ function EditableList({
       <div className="mb-3">
         <h2 className="text-sm font-bold text-gray-800">{title}</h2>
         <p className="text-xs text-gray-600">{subtitle}</p>
+        <p className="mt-1 text-xs text-gray-500">
+          Glissez une pharmacie pour la déplacer dans la liste.
+        </p>
       </div>
       <ol className="space-y-1">
-        {entries.map((e, index) => (
-          <li
-            key={`${e.name}-${index}`}
-            className="flex items-center gap-2 text-sm text-gray-800"
-          >
-            <span
-              className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${badgeClass}`}
+        {entries.map((e, index) => {
+          const isDragging = draggedIndex === index;
+          const isOver = overIndex === index && draggedIndex !== null && !isDragging;
+
+          return (
+            <li
+              key={`${e.name}-${index}`}
+              draggable
+              onDragStart={(event) => {
+                handleDragStart(index);
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/plain", String(index));
+              }}
+              onDragOver={(event) => handleDragOver(event, index)}
+              onDrop={() => handleDrop(index)}
+              onDragEnd={handleDragEnd}
+              className={`flex cursor-grab items-center gap-2 rounded-lg border px-2 py-1.5 text-sm text-gray-800 transition-colors active:cursor-grabbing ${
+                isDragging
+                  ? "border-blue-300 bg-white/80 opacity-50 shadow-sm"
+                  : isOver
+                    ? "border-blue-400 bg-white ring-2 ring-blue-300"
+                    : "border-transparent bg-white/40 hover:bg-white/70"
+              }`}
+              title="Glisser pour déplacer"
             >
-              {e.position}
-            </span>
-            <span className="min-w-0 flex-1 truncate" title={e.name}>
-              {shortName(e.name)}
-            </span>
-            {showDetail && e.detail && (
-              <span className="shrink-0 text-xs text-gray-500">{e.detail}</span>
-            )}
-            <div className="flex shrink-0 gap-0.5">
-              <button
-                type="button"
-                onClick={() => move(index, -1)}
-                disabled={index === 0}
-                className="rounded border border-gray-300 px-1.5 py-0.5 text-xs disabled:opacity-30"
-                aria-label="Monter"
+              <span
+                className="shrink-0 select-none text-base leading-none text-gray-400"
+                aria-hidden
               >
-                ↑
-              </button>
-              <button
-                type="button"
-                onClick={() => move(index, 1)}
-                disabled={index === entries.length - 1}
-                className="rounded border border-gray-300 px-1.5 py-0.5 text-xs disabled:opacity-30"
-                aria-label="Descendre"
+                ⠿
+              </span>
+              <span
+                className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${badgeClass}`}
               >
-                ↓
-              </button>
-            </div>
-          </li>
-        ))}
+                {e.position}
+              </span>
+              <span className="min-w-0 flex-1 truncate select-none" title={e.name}>
+                {shortName(e.name)}
+              </span>
+              {showDetail && e.detail && (
+                <span className="shrink-0 select-none text-xs text-gray-500">
+                  {e.detail}
+                </span>
+              )}
+            </li>
+          );
+        })}
       </ol>
     </section>
   );
