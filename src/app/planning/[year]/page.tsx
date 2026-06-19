@@ -97,10 +97,10 @@ export default function PlanningPage({
         <h1 className="text-2xl font-bold">Planning {year}</h1>
         <p className="mt-4 text-gray-500">Aucune donnée pour cette année.</p>
         <a
-          href="/generate"
-          className="mt-4 inline-block text-blue-600 hover:underline"
+          href={`/generate?year=${year}`}
+          className="mt-4 inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
         >
-          Générer le planning →
+          Générer le planning
         </a>
       </div>
     );
@@ -126,6 +126,12 @@ export default function PlanningPage({
             className="rounded-lg border border-indigo-300 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-800 hover:bg-indigo-100"
           >
             Voir les rotations
+          </Link>
+          <Link
+            href={`/generate?year=${year}`}
+            className="rounded-lg border border-blue-300 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-800 hover:bg-blue-100"
+          >
+            Régénérer
           </Link>
           <ExportButton year={year} />
           {!markedDone && (

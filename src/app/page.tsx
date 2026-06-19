@@ -87,12 +87,32 @@ export default async function HomePage() {
                     )}
                   </span>
                 </div>
-                <Link
-                  href={hasPlanning ? `/planning/${y.year}` : "/generate"}
-                  className="text-sm font-medium text-blue-600 hover:underline"
-                >
-                  {hasPlanning ? "Voir le planning →" : "Générer →"}
-                </Link>
+                <div className="flex flex-wrap items-center gap-2">
+                  {hasPlanning && (
+                    <>
+                      <Link
+                        href={`/planning/${y.year}`}
+                        className="text-sm font-medium text-blue-600 hover:underline"
+                      >
+                        Voir le planning
+                      </Link>
+                      <span className="text-gray-300">·</span>
+                      <Link
+                        href={`/planning/${y.year}/rotations`}
+                        className="text-sm font-medium text-indigo-600 hover:underline"
+                      >
+                        Rotations
+                      </Link>
+                      <span className="text-gray-300">·</span>
+                    </>
+                  )}
+                  <Link
+                    href={`/generate?year=${y.year}`}
+                    className="text-sm font-medium text-blue-600 hover:underline"
+                  >
+                    {hasPlanning ? "Régénérer" : "Générer →"}
+                  </Link>
+                </div>
               </li>
             );
             })}

@@ -11,7 +11,7 @@ export default function YearSelector({
   value,
   onChange,
   minYear = 2024,
-  maxYear = 2035,
+  maxYear = Math.max(2035, new Date().getFullYear() + 5),
 }: YearSelectorProps) {
   const years = [];
   for (let y = minYear; y <= maxYear; y++) years.push(y);

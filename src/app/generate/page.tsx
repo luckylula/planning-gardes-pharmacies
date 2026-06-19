@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import YearSelector from "@/components/YearSelector";
 import {
   PHARMACIES_CENTRE,
@@ -14,6 +14,7 @@ interface GeneratePreview {
   year: number;
   hasPrevious: boolean;
   previousYear?: number;
+  alreadyGenerated?: boolean;
   defaults: {
     centreStartIdx: number;
     ferieStartIdx: number;
@@ -28,9 +29,20 @@ interface GeneratePreview {
   };
 }
 
-export default function GeneratePage() {
+function parseYearParam(value: string | null): number | null {
+  if (!value) return null;
+  const y = parseInt(value, 10);
+  return Number.isFinite(y) ? y : null;
+}
+
+function GeneratePageContent() {
   const router = useRouter();
-  const [year, setYear] = useState(new Date().getFullYear() + 1);
+  const searchParams = useSearchParams();
+  const yearFromUrl = parseYearParam(searchParams.get("year"));
+
+  const [year, setYear] = useState(
+    yearFromUrl ?? new Date().getFullYear() + 1
+  );
   const [preview, setPreview] = useState<GeneratePreview | null>(null);
   const [config, setConfig] = useState({
     centreStartIdx: 0,
@@ -41,6 +53,12 @@ export default function GeneratePage() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (yearFromUrl != null) {
+      setYear(yearFromUrl);
+    }
+  }, [yearFromUrl]);
 
   const loadPreview = useCallback(async () => {
     const res = await fetch(`/api/generate?year=${year}`);
@@ -88,6 +106,14 @@ export default function GeneratePage() {
 
         {preview && (
           <>
+            {preview.alreadyGenerated && (
+              <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+                Le planning <strong>{year}</strong> existe déjà. Vous pouvez le
+                régénérer ici — l&apos;ancien sera remplacé. Pas besoin de
+                réinitialiser l&apos;année au préalable.
+              </p>
+            )}
+
             {preview.hasPrevious ? (
               <p className="rounded-lg bg-blue-50 p-3 text-sm text-blue-800">
                 Paramètres détectés depuis l&apos;année {preview.previousYear}
@@ -185,9 +211,23 @@ export default function GeneratePage() {
           disabled={loading}
           className="w-full rounded-lg bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
         >
-          {loading ? "Génération en cours..." : "Générer le planning"}
+          {loading
+            ? "Génération en cours..."
+            : preview?.alreadyGenerated
+              ? `Régénérer le planning ${year}`
+              : "Générer le planning"}
         </button>
       </div>
     </div>
+  );
+}
+
+export default function GeneratePage() {
+  return (
+    <Suspense
+      fallback={<p className="text-center text-gray-500">Chargement...</p>}
+    >
+      <GeneratePageContent />
+    </Suspense>
   );
 }

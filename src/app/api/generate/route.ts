@@ -52,12 +52,20 @@ export async function GET(req: NextRequest) {
     ? parseInt(yearParam, 10)
     : new Date().getFullYear() + 1;
 
+  const existing = await prisma.yearConfig.findUnique({
+    where: { year },
+    select: { generated: true },
+  });
+  const dayCount = await prisma.planningDay.count({ where: { year } });
+  const alreadyGenerated = (existing?.generated ?? false) || dayCount > 0;
+
   const { hasPrevious, previousYear, defaults } = await defaultsForYear(year);
 
   if (!hasPrevious) {
     return NextResponse.json({
       year,
       hasPrevious: false,
+      alreadyGenerated,
       defaults,
       labels: {
         centreNext: getPharmacyByIdx("centre", defaults.centreStartIdx).name,
@@ -75,6 +83,7 @@ export async function GET(req: NextRequest) {
     year,
     hasPrevious: true,
     previousYear,
+    alreadyGenerated,
     defaults,
     labels: {
       centreNext: getPharmacyByIdx("centre", defaults.centreStartIdx).name,
